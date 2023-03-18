@@ -3,10 +3,17 @@ use crate::vec_math::norm;
 use crate::vec_math::Ray;
 use crate::vec_math::Vec3;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum MaterialType {
+    Reflective,
+    Glossy,
+    Matte,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Material {
     pub(crate) color: Vec3,
-    pub(crate) reflective: bool,
+    pub(crate) t: MaterialType,
 }
 
 #[derive(Debug, Copy, Clone)]

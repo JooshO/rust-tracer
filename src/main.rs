@@ -26,7 +26,7 @@ const BLUE: geometry::Material = geometry::Material {
         y: 0.0,
         z: 1.0,
     },
-    reflective: false,
+    t: geometry::MaterialType::Glossy,
 };
 
 const REFL: geometry::Material = geometry::Material {
@@ -35,7 +35,7 @@ const REFL: geometry::Material = geometry::Material {
         y: 0.0,
         z: 0.0,
     },
-    reflective: true,
+    t: geometry::MaterialType::Reflective,
 };
 
 const RED: geometry::Material = geometry::Material {
@@ -44,7 +44,7 @@ const RED: geometry::Material = geometry::Material {
         y: 0.0,
         z: 0.0,
     },
-    reflective: false,
+    t: geometry::MaterialType::Matte,
 };
 
 const WHITE: geometry::Material = geometry::Material {
@@ -53,7 +53,7 @@ const WHITE: geometry::Material = geometry::Material {
         y: 1.0,
         z: 1.0,
     },
-    reflective: false,
+    t: geometry::MaterialType::Matte,
 };
 
 const NUL: geometry::Material = geometry::Material {
@@ -62,7 +62,7 @@ const NUL: geometry::Material = geometry::Material {
         y: 0.0,
         z: 0.0,
     },
-    reflective: false,
+    t: geometry::MaterialType::Matte,
 };
 
 // use as f32 to cast ints to floats
@@ -119,9 +119,27 @@ fn diffuse_calc(r: RayHit, light: Vec3, spheres: &[Sphere], triangles: &[Triangl
         return 0.2;
     }
 
-    return f32::clamp(to_light_norm * r.surface_normal, 0.2, 1.0);
+    return f32::clamp(to_light_norm * r.surface_normal, 0.2, 1.0); // TODO: 0.2 can be a shadow
+}
 
-    // return f32::clamp(to_light_norm * r.surface_normal, 0.2, 100.0);
+fn specular_calc(
+    surface_norm: Vec3,
+    light_pos: Vec3,
+    pos: Vec3,
+    impact_direction: Vec3,
+    _spheres: &[Sphere],
+    _triangles: &[Triangle],
+) -> f32 {
+    // TODO THIS DOES NOT WORK
+    let reflect = surface_norm * (-2.0 * (impact_direction * surface_norm)) + impact_direction;
+
+    let light_dir_norm = norm(light_pos - pos);
+    let half_angle = norm(norm(pos * -1.0) + light_dir_norm);
+    let specular = (norm(reflect) * half_angle).powf(10.0);
+
+    return specular.clamp(0.0, 1.0);
+    // return (norm(reflect) * norm(pos)).powf(10.0).clamp(0.0, 1.0);
+    // return specular.clamp(0.0, 1.0);
 }
 
 fn main() {
@@ -156,7 +174,7 @@ fn main() {
     let mut img: image::RgbImage = image::ImageBuffer::new(pixel_count, pixel_count);
 
     let start_pos = vec(0.0, 0.0, 0.0);
-    let light_pos = vec(3.0, 10.0, -10.0);
+    let light_pos = vec(3.0, 20.0, -3.0);
 
     let spheres = [
         sphere(vec(0.1, 2.0, -15.0), 1.0, REFL, 1 as i8),
@@ -212,17 +230,31 @@ fn main() {
         let mut ray_hit = find_closest_hit(ray_to_target, -1 as i8, &spheres, &triangles);
 
         if ray_hit.t >= 0.0 && ray_hit.t != f32::MAX {
-            if !ray_hit.mat.reflective {
+            if ray_hit.mat.t == geometry::MaterialType::Matte {
                 let diffuse = diffuse_calc(ray_hit, light_pos, &spheres, &triangles);
 
                 r = (ray_hit.mat.color.x * diffuse * 255.0) as u8;
                 g = (ray_hit.mat.color.y * diffuse * 255.0) as u8;
                 b = (ray_hit.mat.color.z * diffuse * 255.0) as u8;
+            } else if ray_hit.mat.t == geometry::MaterialType::Glossy {
+                let diffuse = diffuse_calc(ray_hit, light_pos, &spheres, &triangles);
+                let specular = specular_calc(
+                    ray_hit.surface_normal,
+                    light_pos,
+                    ray_hit.intersect,
+                    ray_to_target.direction_vector,
+                    &spheres,
+                    &triangles,
+                );
+
+                r = ((ray_hit.mat.color.x * diffuse + specular) * 255.0) as u8;
+                g = ((ray_hit.mat.color.y * diffuse + specular) * 255.0) as u8;
+                b = ((ray_hit.mat.color.z * diffuse + specular) * 255.0) as u8;
             } else {
                 let mut hit_space = false;
 
                 for _i in 0..reflection_depth {
-                    if !ray_hit.mat.reflective {
+                    if ray_hit.mat.t != geometry::MaterialType::Reflective {
                         break;
                     }
 
@@ -231,6 +263,7 @@ fn main() {
                             * (-2.0 * (ray_to_target.direction_vector * ray_hit.surface_normal))
                             + ray_to_target.direction_vector,
                     );
+
                     ray_to_target = Ray {
                         start_pos: ray_hit.intersect,
                         direction_vector: direction,
@@ -244,7 +277,7 @@ fn main() {
                     }
                 }
 
-                if !ray_hit.mat.reflective && !hit_space {
+                if ray_hit.mat.t != geometry::MaterialType::Reflective && !hit_space {
                     let diffuse = diffuse_calc(ray_hit, light_pos, &spheres, &triangles);
                     r = (ray_hit.mat.color.x * diffuse * 255.0) as u8;
                     g = (ray_hit.mat.color.y * diffuse * 255.0) as u8;
