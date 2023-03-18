@@ -131,11 +131,13 @@ fn specular_calc(
     _triangles: &[Triangle],
 ) -> f32 {
     // TODO THIS DOES NOT WORK
-    let reflect = surface_norm * (-2.0 * (impact_direction * surface_norm)) + impact_direction;
-
+    // let reflect = surface_norm * (-2.0 * (impact_direction * surface_norm)) + impact_direction;
     let light_dir_norm = norm(light_pos - pos);
+    let reflect = surface_norm * (surface_norm * light_dir_norm * 2.0) - light_dir_norm;
+
     let half_angle = norm(norm(pos * -1.0) + light_dir_norm);
-    let specular = (norm(reflect) * half_angle).powf(10.0);
+    // let specular = (norm(reflect) * half_angle).powf(10.0);
+    let specular = (norm(reflect) * norm(pos * -1.0)).powf(11.0);
 
     return specular.clamp(0.0, 1.0);
     // return (norm(reflect) * norm(pos)).powf(10.0).clamp(0.0, 1.0);
@@ -174,7 +176,7 @@ fn main() {
     let mut img: image::RgbImage = image::ImageBuffer::new(pixel_count, pixel_count);
 
     let start_pos = vec(0.0, 0.0, 0.0);
-    let light_pos = vec(3.0, 20.0, -3.0);
+    let light_pos = vec(-3.0, 10.0, -10.0);
 
     let spheres = [
         sphere(vec(0.1, 2.0, -15.0), 1.0, REFL, 1 as i8),
