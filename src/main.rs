@@ -211,6 +211,7 @@ fn main() {
         }
     }
     let mut spheres: Vec<Sphere> = Vec::new();
+    let mut triangles: Vec<Triangle> = Vec::new();
 
     let lines = read_lines("./test.ray".to_string());
     for line in lines {
@@ -247,12 +248,38 @@ fn main() {
 
                 spheres.push(sphere);
             }
-            "triangle" => {}
+            "triangle" => {
+                let a_str = split.next().unwrap_or_default();
+                let b_str = split.next().unwrap_or_default();
+                let c_str = split.next().unwrap_or_default();
+                let color_str = split.next().unwrap_or_default();
+                let mat_type_str = split.next().unwrap_or_default();
+                let id_str = split.next().unwrap_or_default();
+
+                let a = parse_vec(a_str);
+                let b = parse_vec(b_str);
+                let c = parse_vec(c_str);
+                let color = parse_vec(color_str);
+                let id = id_str.parse::<i8>().unwrap_or_else(|_val| -> i8 { -1 });
+                let mat_type = match mat_type_str {
+                    "matte" => geometry::MaterialType::Matte,
+                    "glossy" => geometry::MaterialType::Glossy,
+                    "refl" => geometry::MaterialType::Reflective,
+                    _ => geometry::MaterialType::Matte,
+                };
+                let triangle = Triangle {
+                    a,
+                    b,
+                    c,
+                    mat: geometry::Material { color, t: mat_type },
+                    id,
+                };
+
+                triangles.push(triangle);
+            }
             _ => println!("Invalid line"),
         }
     }
-
-    println!("{:?}", spheres);
 
     let image_size = 2;
     let pixel_width = image_size as f32 / pixel_count as f32;
@@ -260,44 +287,6 @@ fn main() {
 
     let start_pos = vec(0.0, 0.0, 0.0);
     let light_pos = vec(-3.0, 8.0, -6.0);
-
-    let triangles = [
-        triangle(
-            vec(-8.0, -2.0, -20.0),
-            vec(8.0, -2.0, -20.0),
-            vec(8.0, 10.0, -20.0),
-            RED,
-            3,
-        ),
-        triangle(
-            vec(-8.0, -2.0, -20.0),
-            vec(8.0, 10.0, -20.0),
-            vec(-8.0, 10.0, -20.0),
-            RED,
-            4,
-        ),
-        triangle(
-            vec(-8.0, -2.0, -20.0),
-            vec(8.0, -2.0, -10.0),
-            vec(8.0, -2.0, -20.0),
-            WHITE,
-            5,
-        ),
-        triangle(
-            vec(-8.0, -2.0, -20.0),
-            vec(-8.0, -2.0, -10.0),
-            vec(8.0, -2.0, -10.0),
-            WHITE,
-            6,
-        ),
-        triangle(
-            vec(8.0, -2.0, -20.0),
-            vec(8.0, -2.0, -10.0),
-            vec(8.0, 10.0, -20.0),
-            WHITE,
-            7,
-        ),
-    ];
 
     for (x, y, pixel) in img.enumerate_pixels_mut() {
         let mut r = 0 as u8;
