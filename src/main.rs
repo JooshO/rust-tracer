@@ -126,22 +126,28 @@ fn specular_calc(
     surface_norm: Vec3,
     light_pos: Vec3,
     pos: Vec3,
-    impact_direction: Vec3,
-    _spheres: &[Sphere],
-    _triangles: &[Triangle],
+    spheres: &[Sphere],
+    triangles: &[Triangle],
+    id: i8,
 ) -> f32 {
-    // TODO THIS DOES NOT WORK
-    // let reflect = surface_norm * (-2.0 * (impact_direction * surface_norm)) + impact_direction;
     let light_dir_norm = norm(light_pos - pos);
     let reflect = surface_norm * (surface_norm * light_dir_norm * 2.0) - light_dir_norm;
-
-    let half_angle = norm(norm(pos * -1.0) + light_dir_norm);
-    // let specular = (norm(reflect) * half_angle).powf(10.0);
     let specular = (norm(reflect) * norm(pos * -1.0)).powf(11.0);
 
+    let light_blocker = find_closest_hit(
+        Ray {
+            start_pos: pos,
+            direction_vector: light_dir_norm,
+        },
+        id,
+        &spheres,
+        &triangles,
+    );
+
+    if light_blocker.t > 0.0 && mag(&(light_pos - pos)) > light_blocker.t {
+        return 0.0;
+    }
     return specular.clamp(0.0, 1.0);
-    // return (norm(reflect) * norm(pos)).powf(10.0).clamp(0.0, 1.0);
-    // return specular.clamp(0.0, 1.0);
 }
 
 fn main() {
@@ -222,7 +228,6 @@ fn main() {
     ];
 
     for (x, y, pixel) in img.enumerate_pixels_mut() {
-        // println!("{:?} {:?}", x, y);
         let mut r = 0 as u8;
         let mut g = 0 as u8;
         let mut b = 0 as u8;
@@ -244,9 +249,9 @@ fn main() {
                     ray_hit.surface_normal,
                     light_pos,
                     ray_hit.intersect,
-                    ray_to_target.direction_vector,
                     &spheres,
                     &triangles,
+                    ray_hit.id,
                 );
 
                 r = ((ray_hit.mat.color.x * diffuse + specular) * 255.0) as u8;
