@@ -1,6 +1,5 @@
 // using https://github.com/image-rs/image | https://docs.rs/crate/image/latest
 
-use geometry::sphere;
 use geometry::sphere_hit;
 use geometry::triangle_hit;
 use geometry::RayHit;
@@ -15,7 +14,10 @@ use vec_math::Vec3;
 use crate::geometry::triangle;
 use std::collections::VecDeque;
 use std::env;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
 use std::num::ParseIntError;
+use std::path::Path;
 
 mod geometry;
 mod vec_math;
@@ -150,6 +152,38 @@ fn specular_calc(
     return specular.clamp(0.0, 1.0);
 }
 
+fn read_lines(filename: String) -> io::Lines<BufReader<File>> {
+    // Open the file in read-only mode.
+    let file = File::open(filename).unwrap();
+    // Read the file line by line, and return an iterator of the lines of the file.
+    return io::BufReader::new(file).lines();
+}
+
+fn parse_vec(string: &str) -> Vec3 {
+    let mut chars = string.chars();
+    chars.next();
+    chars.next_back();
+    let fixed_str = chars.as_str();
+    let mut split = fixed_str.split(" ");
+    let x = split
+        .next()
+        .unwrap_or_else(|| -> &str { "" })
+        .parse::<f32>()
+        .unwrap_or_else(|_val| -> f32 { 0.0 });
+    let y = split
+        .next()
+        .unwrap_or_else(|| -> &str { "" })
+        .parse::<f32>()
+        .unwrap_or_else(|_val| -> f32 { 0.0 });
+    let z = split
+        .next()
+        .unwrap_or_else(|| -> &str { "" })
+        .parse::<f32>()
+        .unwrap_or_else(|_val| -> f32 { 0.0 });
+
+    return vec(x, y, z);
+}
+
 fn main() {
     let mut args: VecDeque<String> = env::args().collect();
     args.pop_front();
@@ -176,18 +210,56 @@ fn main() {
             _ => println!("Invalid command: {:?}", command),
         }
     }
+    let mut spheres: Vec<Sphere> = Vec::new();
+
+    let lines = read_lines("./test.ray".to_string());
+    for line in lines {
+        let line_str = line.unwrap_or_default();
+        println!("{:?}", line_str);
+        let mut split = line_str.split(",");
+        match split.next().unwrap_or_default() {
+            "sphere" => {
+                let center_str = split.next().unwrap_or_default();
+                let rad_str = split.next().unwrap_or_default();
+                let color_str = split.next().unwrap_or_default();
+                let mat_type_str = split.next().unwrap_or_default();
+                let id_str = split.next().unwrap_or_default();
+
+                let center = parse_vec(center_str);
+                let color = parse_vec(color_str);
+                let radius = rad_str.parse::<f32>().unwrap_or_else(|_val| -> f32 { 0.0 });
+                let id = id_str.parse::<i8>().unwrap_or_else(|_val| -> i8 { -1 });
+                let mat_type = match mat_type_str {
+                    "matte" => geometry::MaterialType::Matte,
+                    "glossy" => geometry::MaterialType::Glossy,
+                    "refl" => geometry::MaterialType::Reflective,
+                    _ => geometry::MaterialType::Matte,
+                };
+                let sphere = Sphere {
+                    center,
+                    mat: geometry::Material {
+                        color: color,
+                        t: mat_type,
+                    },
+                    radius,
+                    id,
+                };
+
+                spheres.push(sphere);
+            }
+            "triangle" => {}
+            _ => println!("Invalid line"),
+        }
+    }
+
+    println!("{:?}", spheres);
 
     let image_size = 2;
     let pixel_width = image_size as f32 / pixel_count as f32;
     let mut img: image::RgbImage = image::ImageBuffer::new(pixel_count, pixel_count);
 
     let start_pos = vec(0.0, 0.0, 0.0);
-    let light_pos = vec(-3.0, 10.0, -10.0);
-
-    let spheres = [
-        sphere(vec(0.1, 2.0, -15.0), 1.0, REFL, 1 as i8),
-        sphere(vec(-3.0, 0.0, -10.0), 2.5, BLUE, 2 as i8),
-    ];
+    let light_pos = vec(-3.0, 8.0, -6.0);
 
     let triangles = [
         triangle(

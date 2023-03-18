@@ -82,14 +82,14 @@ pub fn triangle_hit(tr: Triangle, r: Ray, close: RayHit) -> RayHit {
     };
 }
 
-pub fn sphere(c: Vec3, r: f32, m: Material, i: i8) -> Sphere {
-    return Sphere {
-        center: c,
-        radius: r,
-        mat: m,
-        id: i,
-    };
-}
+// pub fn sphere(c: Vec3, r: f32, m: Material, i: i8) -> Sphere {
+//     return Sphere {
+//         center: c,
+//         radius: r,
+//         mat: m,
+//         id: i,
+//     };
+// }
 
 #[derive(Debug, Copy, Clone)]
 pub struct RayHit {
