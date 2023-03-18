@@ -1,3 +1,4 @@
+/// A simple 3-vector. Can be used for any 3-tuple of floats i.e. for rgb, positions, or true vectors
 #[derive(Debug, Copy, Clone)]
 pub struct Vec3 {
     pub x: f32,
@@ -5,6 +6,7 @@ pub struct Vec3 {
     pub z: f32,
 }
 
+/// A ray consisting of a starting position and a direction. The direction should always be normalized.
 #[derive(Debug, Copy, Clone)]
 pub struct Ray {
     pub start_pos: Vec3,

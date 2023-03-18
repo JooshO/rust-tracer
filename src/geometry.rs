@@ -1,7 +1,4 @@
-use crate::vec_math::cross;
-use crate::vec_math::norm;
-use crate::vec_math::Ray;
-use crate::vec_math::Vec3;
+use crate::vec_math::{cross, norm, Ray, Vec3};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MaterialType {
@@ -31,16 +28,6 @@ pub struct Triangle {
     pub c: Vec3,
     pub mat: Material,
     pub id: i8,
-}
-
-pub fn triangle(a: Vec3, b: Vec3, c: Vec3, mat: Material, id: i8) -> Triangle {
-    return Triangle {
-        a: a,
-        b: b,
-        c: c,
-        mat: mat,
-        id: id,
-    };
 }
 
 pub fn triangle_hit(tr: Triangle, r: Ray, close: RayHit) -> RayHit {

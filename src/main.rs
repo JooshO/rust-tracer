@@ -1,63 +1,17 @@
 // using https://github.com/image-rs/image | https://docs.rs/crate/image/latest
 
-use geometry::sphere_hit;
-use geometry::triangle_hit;
-use geometry::RayHit;
-use geometry::Sphere;
-use geometry::Triangle;
-use vec_math::mag;
-use vec_math::norm;
-use vec_math::vec;
-use vec_math::Ray;
-use vec_math::Vec3;
+mod geometry;
+mod vec_math;
 
-use crate::geometry::triangle;
+use geometry::{sphere_hit, triangle_hit, RayHit, Sphere, Triangle};
 use std::collections::VecDeque;
 use std::env;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::num::ParseIntError;
-use std::path::Path;
+use vec_math::{mag, norm, vec, Ray, Vec3};
 
-mod geometry;
-mod vec_math;
-
-const BLUE: geometry::Material = geometry::Material {
-    color: Vec3 {
-        x: 0.0,
-        y: 0.0,
-        z: 1.0,
-    },
-    t: geometry::MaterialType::Glossy,
-};
-
-const REFL: geometry::Material = geometry::Material {
-    color: Vec3 {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    },
-    t: geometry::MaterialType::Reflective,
-};
-
-const RED: geometry::Material = geometry::Material {
-    color: Vec3 {
-        x: 1.0,
-        y: 0.0,
-        z: 0.0,
-    },
-    t: geometry::MaterialType::Matte,
-};
-
-const WHITE: geometry::Material = geometry::Material {
-    color: Vec3 {
-        x: 1.0,
-        y: 1.0,
-        z: 1.0,
-    },
-    t: geometry::MaterialType::Matte,
-};
-
+/// Constant null Material used as a default
 const NUL: geometry::Material = geometry::Material {
     color: Vec3 {
         x: 0.0,
@@ -67,7 +21,12 @@ const NUL: geometry::Material = geometry::Material {
     t: geometry::MaterialType::Matte,
 };
 
-// use as f32 to cast ints to floats
+/// Returns a ray pointing at the image frame through a given pixel
+/// # Arguements
+/// * 'x' - A float for the x pixel
+/// * 'y' - A float for the y pixel
+/// * 'starting_pos' - A coordinate in 3 space for where the ray should emmenate from. Usually where the camera is
+/// * 'pixel_width' - The width in arbitrary units of a given pixel in our final image
 fn get_ray(x: f32, y: f32, starting_pos: Vec3, pixel_width: f32) -> Ray {
     let img_x = (x * pixel_width) + (pixel_width / 2.0) - 1.0;
     let img_y = -((y * pixel_width) + (pixel_width / 2.0) - 1.0);
@@ -78,6 +37,12 @@ fn get_ray(x: f32, y: f32, starting_pos: Vec3, pixel_width: f32) -> Ray {
     };
 }
 
+/// Finds the closest surface to a ray's origin along its direction. Used to see what a Ray would hit first
+/// # Arguements
+/// * 'ray' - The ray we want to test
+/// * 'id' - An id of objects to ignore. Used to stop shadow/reflection acne
+/// * 'spheres' - a slice of spheres to check the ray against
+/// * 'triangles' - a slice of triangles to check the ray against
 fn find_closest_hit(ray: Ray, id: i8, spheres: &[Sphere], triangles: &[Triangle]) -> RayHit {
     let mut r: RayHit = RayHit {
         t: f32::MAX,
@@ -132,10 +97,16 @@ fn specular_calc(
     triangles: &[Triangle],
     id: i8,
 ) -> f32 {
+    // normalized vector from point to light
     let light_dir_norm = norm(light_pos - pos);
+
+    // reflection of light vector across surface normal vector
     let reflect = surface_norm * (surface_norm * light_dir_norm * 2.0) - light_dir_norm;
+
+    // basically how close that reflection is to our camera
     let specular = (norm(reflect) * norm(pos * -1.0)).powf(11.0);
 
+    // make sure the light isn't getting blocked
     let light_blocker = find_closest_hit(
         Ray {
             start_pos: pos,
@@ -149,6 +120,8 @@ fn specular_calc(
     if light_blocker.t > 0.0 && mag(&(light_pos - pos)) > light_blocker.t {
         return 0.0;
     }
+
+    // clamp values to the reasonable
     return specular.clamp(0.0, 1.0);
 }
 
@@ -185,27 +158,36 @@ fn parse_vec(string: &str) -> Vec3 {
 }
 
 fn main() {
+    // grab our args and spit out the executable name - we don't need it
     let mut args: VecDeque<String> = env::args().collect();
     args.pop_front();
 
+    // define some defauls
     let mut pixel_count = 512 as u32;
     let mut reflection_depth = 10;
+    let file_name = "./test.ray";
+    let mut lines = read_lines(file_name.to_string());
 
+    // loop over our args to check and see what command line args we have
     for arg in args {
+        // split the arguement into command and value - what we are configing and the value we are giving it
         let mut split = arg.split("=");
         let command = split.next().unwrap_or_else(|| -> &str { "none" });
         let value = split.next().unwrap_or_else(|| -> &str { "" });
 
         match command {
-            "--res" => {
+            "--res" | "--resolution" => {
                 pixel_count = value
                     .parse::<u32>()
                     .unwrap_or_else(|_val: ParseIntError| -> u32 { 512 })
             }
-            "--ref" => {
+            "--ref" | "--reflections" => {
                 reflection_depth = value
                     .parse::<i32>()
                     .unwrap_or_else(|_val: ParseIntError| -> i32 { 10 })
+            }
+            "--file" | "--input" | "--f" => {
+                lines = read_lines(value.to_string());
             }
             _ => println!("Invalid command: {:?}", command),
         }
@@ -213,7 +195,6 @@ fn main() {
     let mut spheres: Vec<Sphere> = Vec::new();
     let mut triangles: Vec<Triangle> = Vec::new();
 
-    let lines = read_lines("./test.ray".to_string());
     for line in lines {
         let line_str = line.unwrap_or_default();
         println!("{:?}", line_str);
